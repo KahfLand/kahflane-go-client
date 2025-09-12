@@ -17,7 +17,7 @@ A Go client library for connecting to KahfLane database servers via WebSocket co
 ## Installation
 
 ```bash
-go get github.com/KahfLand/kahflane/client-go
+go get github.com/KahfLand/kahflane-go
 ```
 
 ## Quick Start
@@ -30,7 +30,7 @@ import (
     "log"
     "time"
     
-    kahflane "github.com/KahfLand/kahflane/client-go"
+    kahflane "github.com/KahfLand/kahflane-go"
 )
 
 func main() {

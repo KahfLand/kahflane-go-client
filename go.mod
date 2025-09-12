@@ -1,4 +1,4 @@
-module github.com/KahfLand/kahflane/client-go
+module github.com/KahfLand/kahflane-go
 
 go 1.24.4
 
