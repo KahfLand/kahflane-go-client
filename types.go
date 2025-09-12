@@ -325,7 +325,7 @@ type RestoreOptions struct {
 
 // DatabaseInfo represents information about a database
 type DatabaseInfo struct {
-	Name       string  `json:"name"`
+	Name       string  `json:"database_name"`
 	SizeMB     float64 `json:"size_mb"`
 	TableCount int     `json:"table_count"`
 	Status     string  `json:"status"`

@@ -13,7 +13,7 @@ func main() {
 	// https://
 	serverURL := "ws://localhost:8080" // test-khf-7084
 	rootUser := "root"
-	rootPassword := ""
+	rootPassword := "sk_root_smg9nW96PyOIA51pIs4wdiZ8pCLDFoztb3YHcPafRs"
 	mainDatabase := "main"
 	testDatabase := "testdb"
 	newUser := "testuser"
@@ -69,6 +69,13 @@ func main() {
 		log.Fatalf("Failed to create database: %v, Result: %+v", err, res)
 	}
 	log.Printf("✅ Database '%s' created successfully.", testDatabase)
+
+	log.Println("\n--- Step 2.1: List databases ---")
+	databases, err := client.ListDatabases()
+	if err != nil {
+		log.Fatalf("Failed to list databases: %v", err)
+	}
+	log.Printf("✅ Databases: %+v", databases)
 
 	// --- 3. CRUD Operations as Root ---
 	log.Println("\n--- Step 3: Performing CRUD operations as root ---")
