@@ -5,7 +5,7 @@ import (
 	"log"
 	"time"
 
-	kahflane "github.com/KahfLand/kahflane_dbaas/clients/go"
+	kahflane "github.com/KahfLand/kahflane-go"
 )
 
 func main() {

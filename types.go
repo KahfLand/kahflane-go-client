@@ -6,7 +6,6 @@ import (
 )
 
 // Message represents a message exchanged between client and server
-// Corresponds to server's message.go Message struct
 type Message struct {
 	Type          string                 `json:"type"`
 	MessageID     string                 `json:"message_id,omitempty"`
@@ -21,7 +20,6 @@ type Message struct {
 }
 
 // SQLCommand represents SQL command data sent to server
-// Corresponds to server's message.go SQLCommand struct
 type SQLCommand struct {
 	SQL        string        `json:"sql"`
 	Parameters []interface{} `json:"parameters,omitempty"`
@@ -29,7 +27,6 @@ type SQLCommand struct {
 }
 
 // ColumnInfo represents database column metadata
-// Corresponds to server's message.go ColumnInfo struct
 type ColumnInfo struct {
 	Name     string `json:"name"`
 	Type     string `json:"type"`
@@ -40,7 +37,6 @@ type ColumnInfo struct {
 }
 
 // SQLResult represents the result of a SQL query execution
-// Corresponds to server's message.go SQLResult struct
 type SQLResult struct {
 	Success       bool                     `json:"success"`
 	Data          []map[string]interface{} `json:"data,omitempty"`
@@ -155,8 +151,6 @@ func (m *Message) HasError() bool {
 	return m.Error != ""
 }
 
-// User Management Types (corresponding to server auth.go)
-
 // CreateUserRequest represents a request to create a new database user
 type CreateUserRequest struct {
 	Username string `json:"username"`
@@ -240,8 +234,6 @@ type TokenInfo struct {
 	TokenType    string
 }
 
-// Backup and Restore Types (corresponding to server message.go)
-
 // BackupStartRequest represents a request to start a backup operation
 type BackupStartRequest struct {
 	Description string   `json:"description,omitempty"`
@@ -322,9 +314,40 @@ type BackupOptions struct {
 	Tags        []string // Optional tags for the backup
 }
 
-// RestoreOptions holds options for restore operations
+// RestoreOptions holds options for// RestoreOptions struct
 type RestoreOptions struct {
 	BackupFilename  string // Required: filename of the backup to restore
 	ForceRestore    bool   // Optional: force restore even if risky
 	VerifyIntegrity bool   // Optional: verify backup integrity before restore
+}
+
+// Database Management Types
+
+// DatabaseInfo represents information about a database
+type DatabaseInfo struct {
+	Name       string  `json:"name"`
+	SizeMB     float64 `json:"size_mb"`
+	TableCount int     `json:"table_count"`
+	Status     string  `json:"status"`
+	Error      string  `json:"error,omitempty"`
+}
+
+// DatabaseListResult represents the result of listing databases
+type DatabaseListResult struct {
+	Success   bool           `json:"success"`
+	Databases []DatabaseInfo `json:"databases"`
+	Count     int            `json:"count"`
+	Error     string         `json:"error,omitempty"`
+}
+
+// CreateDatabaseRequest represents a request to create a new database
+type CreateDatabaseRequest struct {
+	DatabaseName string `json:"database_name"`
+	Description  string `json:"description,omitempty"`
+}
+
+// DropDatabaseRequest represents a request to drop a database
+type DropDatabaseRequest struct {
+	DatabaseName string `json:"database_name"`
+	Force        bool   `json:"force,omitempty"`
 }

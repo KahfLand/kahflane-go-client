@@ -487,6 +487,85 @@ func (c *Client) ListUsers() (*UserListResult, error) {
 	}
 }
 
+// ListDatabases retrieves a list of all databases
+func (c *Client) ListDatabases() ([]DatabaseInfo, error) {
+	if atomic.LoadInt32(&c.connected) == 0 {
+		return nil, fmt.Errorf("not connected to database")
+	}
+
+	messageID := c.generateMessageID()
+
+	// Create message
+	message := NewMessage("database_list")
+	message.MessageID = messageID
+
+	// Setup pending query
+	pending := &pendingQuery{
+		resultChan: make(chan *SQLResult, 1),
+		errorChan:  make(chan error, 1),
+	}
+
+	timeout := c.config.Timeout
+	if timeout <= 0 {
+		timeout = 30 * time.Second
+	}
+
+	pending.timeout = time.AfterFunc(timeout, func() {
+		c.cleanupPendingQuery(messageID)
+		select {
+		case pending.errorChan <- fmt.Errorf("list databases timeout"):
+		default:
+		}
+	})
+
+	c.mutex.Lock()
+	c.pendingQueries[messageID] = pending
+	c.mutex.Unlock()
+
+	// Send message
+	messageBytes, err := message.ToJSON()
+	if err != nil {
+		c.cleanupPendingQuery(messageID)
+		return nil, fmt.Errorf("failed to marshal message: %w", err)
+	}
+
+	select {
+	case c.writeChan <- messageBytes:
+	case <-c.ctx.Done():
+		c.cleanupPendingQuery(messageID)
+		return nil, fmt.Errorf("client is shutting down")
+	case <-time.After(c.config.WriteTimeout):
+		c.cleanupPendingQuery(messageID)
+		return nil, fmt.Errorf("write timeout")
+	}
+
+	// Wait for result
+	select {
+	case result := <-pending.resultChan:
+		c.cleanupPendingQuery(messageID)
+		// Parse databases from the result data
+		if result.Success {
+			// Extract databases from the Data field
+			if result.Data != nil && len(result.Data) > 0 {
+				if dbsData, ok := result.Data[0]["databases"]; ok {
+					dbBytes, _ := json.Marshal(dbsData)
+					var databases []DatabaseInfo
+					json.Unmarshal(dbBytes, &databases)
+					return databases, nil
+				}
+			}
+			return []DatabaseInfo{}, nil
+		}
+		return nil, fmt.Errorf("database list failed: %s", result.Error)
+	case err := <-pending.errorChan:
+		c.cleanupPendingQuery(messageID)
+		return nil, err
+	case <-c.ctx.Done():
+		c.cleanupPendingQuery(messageID)
+		return nil, fmt.Errorf("client is shutting down")
+	}
+}
+
 // executeUserManagementOperation is a helper function for user management operations
 func (c *Client) executeUserManagementOperation(message *Message, messageID, operation string) (*UserManagementResult, error) {
 	// Setup pending query
@@ -1132,6 +1211,8 @@ func (c *Client) handleMessage(message *Message) {
 		c.handleUserManagementResult(message)
 	case "user_list_result":
 		c.handleUserListResult(message)
+	case "database_list_result":
+		c.handleDatabaseListResult(message)
 	case "backup_started", "backup_complete", "backup_error":
 		c.handleBackupResult(message)
 	case "backup_progress":
@@ -1263,6 +1344,51 @@ func (c *Client) handleUserListResult(message *Message) {
 			{
 				"users": userListResult.Users,
 				"count": userListResult.Count,
+			},
+		},
+	}
+
+	// Resolve pending query
+	if message.MessageID != "" {
+		c.resolvePendingQuery(message.MessageID, sqlResult)
+	}
+}
+
+func (c *Client) handleDatabaseListResult(message *Message) {
+	// Create DatabaseListResult from message data
+	databaseListResult := &DatabaseListResult{
+		Success: false,
+		Error:   message.Error,
+	}
+
+	// Extract success from data
+	if success, ok := message.GetData("success"); ok {
+		if s, ok := success.(bool); ok {
+			databaseListResult.Success = s
+		}
+	}
+
+	if databaseListResult.Success {
+		// Extract databases and count data directly from the message
+		if databasesData, ok := message.GetData("databases"); ok {
+			databaseBytes, _ := json.Marshal(databasesData)
+			json.Unmarshal(databaseBytes, &databaseListResult.Databases)
+		}
+		if countData, ok := message.GetData("count"); ok {
+			if count, ok := countData.(float64); ok {
+				databaseListResult.Count = int(count)
+			}
+		}
+	}
+
+	// Adapt to the pending query system by wrapping it
+	sqlResult := &SQLResult{
+		Success: databaseListResult.Success,
+		Error:   databaseListResult.Error,
+		Data: []map[string]interface{}{
+			{
+				"databases": databaseListResult.Databases,
+				"count":     databaseListResult.Count,
 			},
 		},
 	}
