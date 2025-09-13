@@ -79,19 +79,19 @@ func main() {
 
 	// --- 3. CRUD Operations as Root ---
 	log.Println("\n--- Step 3: Performing CRUD operations as root ---")
-	// Create Table
+	// Create Table in the test database
 	_, err = client.Execute(
-		"CREATE TABLE users (id INTEGER, name VARCHAR, email VARCHAR)",
+		fmt.Sprintf("CREATE TABLE %s.users (id INTEGER, name VARCHAR, email VARCHAR)", testDatabase),
 		nil,
 	)
 	if err != nil {
 		log.Fatalf("Failed to create table: %v", err)
 	}
-	log.Println("✅ Table 'users' created.")
+	log.Println("✅ Table 'users' created in test database.")
 
-	// Insert Data
+	// Insert Data into test database
 	_, err = client.Execute(
-		"INSERT INTO users (id, name, email) VALUES (?, ?, ?)",
+		fmt.Sprintf("INSERT INTO %s.users (id, name, email) VALUES (?, ?, ?)", testDatabase),
 		[]interface{}{1, "Alice", "alice@example.com"},
 	)
 	if err != nil {
@@ -99,16 +99,16 @@ func main() {
 	}
 	log.Println("✅ Inserted initial data for Alice.")
 
-	// Read Data
-	res, err = client.Execute("SELECT * FROM users", nil)
+	// Read Data from test database
+	res, err = client.Execute(fmt.Sprintf("SELECT * FROM %s.users", testDatabase), nil)
 	if err != nil {
 		log.Fatalf("Failed to read data: %v", err)
 	}
 	log.Printf("✅ Read data after insert: %+v", res.Data)
 
-	// Update Data
+	// Update Data in test database
 	_, err = client.Execute(
-		"UPDATE users SET email = ? WHERE id = ?",
+		fmt.Sprintf("UPDATE %s.users SET email = ? WHERE id = ?", testDatabase),
 		[]interface{}{"alice.new@example.com", 1},
 	)
 	if err != nil {
@@ -116,8 +116,8 @@ func main() {
 	}
 	log.Println("✅ Updated Alice's email.")
 
-	// Read Data Again
-	res, err = client.Execute("SELECT * FROM users", nil)
+	// Read Data Again from test database
+	res, err = client.Execute(fmt.Sprintf("SELECT * FROM %s.users", testDatabase), nil)
 	if err != nil {
 		log.Fatalf("Failed to read data after update: %v", err)
 	}
