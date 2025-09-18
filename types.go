@@ -351,3 +351,19 @@ type DropDatabaseRequest struct {
 	DatabaseName string `json:"database_name"`
 	Force        bool   `json:"force,omitempty"`
 }
+
+// DatabaseManagementResult represents the result of database create/drop operations
+type DatabaseManagementResult struct {
+	Success      bool   `json:"success"`
+	DatabaseName string `json:"database_name,omitempty"`
+	Message      string `json:"message,omitempty"`
+	Error        string `json:"error,omitempty"`
+}
+
+// DatabaseInfoResult represents the result of database info operation
+type DatabaseInfoResult struct {
+	Success      bool                   `json:"success"`
+	DatabaseName string                 `json:"database_name,omitempty"`
+	Stats        map[string]interface{} `json:"stats,omitempty"`
+	Error        string                 `json:"error,omitempty"`
+}

@@ -488,6 +488,197 @@ func (c *Client) ListUsers() (*UserListResult, error) {
 }
 
 // ListDatabases retrieves a list of all databases
+// CreateDatabase creates a new database
+func (c *Client) CreateDatabase(req *CreateDatabaseRequest) (*DatabaseManagementResult, error) {
+	if !c.IsConnected() {
+		return nil, fmt.Errorf("client is not connected")
+	}
+
+	messageID := c.generateMessageID()
+	message := &Message{
+		Type:      "database_create",
+		MessageID: messageID,
+	}
+	message.SetData("database_name", req.DatabaseName)
+	if req.Description != "" {
+		message.SetData("description", req.Description)
+	}
+
+	errorChan := make(chan error, 1)
+	timeout := time.NewTimer(30 * time.Second)
+
+	c.mutex.Lock()
+	c.pendingQueries[messageID] = &pendingQuery{
+		resultChan: make(chan *SQLResult, 1),
+		errorChan:  errorChan,
+		timeout:    timeout,
+	}
+	c.mutex.Unlock()
+
+	defer func() {
+		timeout.Stop()
+		c.cleanupPendingQuery(messageID)
+	}()
+
+	messageBytes, err := json.Marshal(message)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal message: %w", err)
+	}
+
+	select {
+	case c.writeChan <- messageBytes:
+	case <-c.ctx.Done():
+		return nil, fmt.Errorf("client is shutting down")
+	case <-timeout.C:
+		return nil, fmt.Errorf("timeout sending message")
+	}
+
+	select {
+	case err := <-errorChan:
+		return nil, err
+	case result := <-c.pendingQueries[messageID].resultChan:
+		if result.Success && len(result.Data) > 0 {
+			if resultData, ok := result.Data[0]["result"]; ok {
+				if dbResult, ok := resultData.(*DatabaseManagementResult); ok {
+					return dbResult, nil
+				}
+			}
+		}
+		return &DatabaseManagementResult{Success: false, Error: "invalid response format"}, nil
+	case <-timeout.C:
+		return nil, fmt.Errorf("timeout waiting for database create result")
+	case <-c.ctx.Done():
+		return nil, fmt.Errorf("client is shutting down")
+	}
+}
+
+// DropDatabase drops an existing database
+func (c *Client) DropDatabase(req *DropDatabaseRequest) (*DatabaseManagementResult, error) {
+	if !c.IsConnected() {
+		return nil, fmt.Errorf("client is not connected")
+	}
+
+	messageID := c.generateMessageID()
+	message := &Message{
+		Type:      "database_drop",
+		MessageID: messageID,
+	}
+	message.SetData("database_name", req.DatabaseName)
+	if req.Force {
+		message.SetData("force", req.Force)
+	}
+
+	errorChan := make(chan error, 1)
+	timeout := time.NewTimer(30 * time.Second)
+
+	c.mutex.Lock()
+	c.pendingQueries[messageID] = &pendingQuery{
+		resultChan: make(chan *SQLResult, 1),
+		errorChan:  errorChan,
+		timeout:    timeout,
+	}
+	c.mutex.Unlock()
+
+	defer func() {
+		timeout.Stop()
+		c.cleanupPendingQuery(messageID)
+	}()
+
+	messageBytes, err := json.Marshal(message)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal message: %w", err)
+	}
+
+	select {
+	case c.writeChan <- messageBytes:
+	case <-c.ctx.Done():
+		return nil, fmt.Errorf("client is shutting down")
+	case <-timeout.C:
+		return nil, fmt.Errorf("timeout sending message")
+	}
+
+	select {
+	case err := <-errorChan:
+		return nil, err
+	case result := <-c.pendingQueries[messageID].resultChan:
+		if result.Success && len(result.Data) > 0 {
+			if resultData, ok := result.Data[0]["result"]; ok {
+				if dbResult, ok := resultData.(*DatabaseManagementResult); ok {
+					return dbResult, nil
+				}
+			}
+		}
+		return &DatabaseManagementResult{Success: false, Error: "invalid response format"}, nil
+	case <-timeout.C:
+		return nil, fmt.Errorf("timeout waiting for database drop result")
+	case <-c.ctx.Done():
+		return nil, fmt.Errorf("client is shutting down")
+	}
+}
+
+// GetDatabaseInfo retrieves information about a specific database
+func (c *Client) GetDatabaseInfo(databaseName string) (*DatabaseInfoResult, error) {
+	if !c.IsConnected() {
+		return nil, fmt.Errorf("client is not connected")
+	}
+
+	messageID := c.generateMessageID()
+	message := &Message{
+		Type:      "database_info",
+		MessageID: messageID,
+		Data: map[string]interface{}{
+			"database_name": databaseName,
+		},
+	}
+
+	errorChan := make(chan error, 1)
+	timeout := time.NewTimer(30 * time.Second)
+
+	c.mutex.Lock()
+	c.pendingQueries[messageID] = &pendingQuery{
+		resultChan: make(chan *SQLResult, 1),
+		errorChan:  errorChan,
+		timeout:    timeout,
+	}
+	c.mutex.Unlock()
+
+	defer func() {
+		timeout.Stop()
+		c.cleanupPendingQuery(messageID)
+	}()
+
+	messageBytes, err := json.Marshal(message)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal message: %w", err)
+	}
+
+	select {
+	case c.writeChan <- messageBytes:
+	case <-c.ctx.Done():
+		return nil, fmt.Errorf("client is shutting down")
+	case <-timeout.C:
+		return nil, fmt.Errorf("timeout sending message")
+	}
+
+	select {
+	case err := <-errorChan:
+		return nil, err
+	case result := <-c.pendingQueries[messageID].resultChan:
+		if result.Success && len(result.Data) > 0 {
+			if resultData, ok := result.Data[0]["result"]; ok {
+				if dbResult, ok := resultData.(*DatabaseInfoResult); ok {
+					return dbResult, nil
+				}
+			}
+		}
+		return &DatabaseInfoResult{Success: false, Error: "invalid response format"}, nil
+	case <-timeout.C:
+		return nil, fmt.Errorf("timeout waiting for database info result")
+	case <-c.ctx.Done():
+		return nil, fmt.Errorf("client is shutting down")
+	}
+}
+
 func (c *Client) ListDatabases() ([]DatabaseInfo, error) {
 	if atomic.LoadInt32(&c.connected) == 0 {
 		return nil, fmt.Errorf("not connected to database")
@@ -1213,6 +1404,10 @@ func (c *Client) handleMessage(message *Message) {
 		c.handleUserListResult(message)
 	case "database_list_result":
 		c.handleDatabaseListResult(message)
+	case "database_create_result", "database_drop_result":
+		c.handleDatabaseManagementResult(message)
+	case "database_info_result":
+		c.handleDatabaseInfoResult(message)
 	case "backup_started", "backup_complete", "backup_error":
 		c.handleBackupResult(message)
 	case "backup_progress":
@@ -1477,32 +1672,93 @@ func (c *Client) handleRestoreProgress(message *Message) {
 
 func (c *Client) handleMaintenanceStatus(message *Message) {
 	if c.onMaintenance != nil {
-		var status MaintenanceStatus
-
-		// Extract MaintenanceStatus from the message data
-		if statusData, ok := message.GetData("status"); ok {
-			if statusMap, ok := statusData.(map[string]interface{}); ok {
-				if state, ok := statusMap["state"].(string); ok {
-					status.State = state
-				}
-				if msg, ok := statusMap["message"].(string); ok {
-					status.Message = msg
-				}
-				if startedAt, ok := statusMap["started_at"].(string); ok {
-					if t, err := time.Parse(time.RFC3339, startedAt); err == nil {
-						status.StartedAt = t
-					}
-				}
-				if estimatedCompletion, ok := statusMap["estimated_completion_ms"].(float64); ok {
-					status.EstimatedCompletion = int64(estimatedCompletion)
-				}
-				if progress, ok := statusMap["progress"].(float64); ok {
-					status.Progress = progress
+		status := &MaintenanceStatus{}
+		if data, ok := message.GetData("state"); ok {
+			if s, ok := data.(string); ok {
+				status.State = s
+			}
+		}
+		if data, ok := message.GetData("message"); ok {
+			if s, ok := data.(string); ok {
+				status.Message = s
+			}
+		}
+		if data, ok := message.GetData("started_at"); ok {
+			if s, ok := data.(string); ok {
+				if t, err := time.Parse(time.RFC3339, s); err == nil {
+					status.StartedAt = t
 				}
 			}
 		}
+		if data, ok := message.GetData("estimated_completion_ms"); ok {
+			if f, ok := data.(float64); ok {
+				status.EstimatedCompletion = int64(f)
+			}
+		}
+		if data, ok := message.GetData("progress"); ok {
+			if f, ok := data.(float64); ok {
+				status.Progress = f
+			}
+		}
+		c.onMaintenance(status)
+	}
+}
 
-		c.onMaintenance(&status)
+func (c *Client) handleDatabaseManagementResult(message *Message) {
+	if message.MessageID != "" {
+		result := &DatabaseManagementResult{
+			Success: !message.HasError(),
+			Error:   message.Error,
+		}
+		
+		if data, ok := message.GetData("database_name"); ok {
+			if s, ok := data.(string); ok {
+				result.DatabaseName = s
+			}
+		}
+		if data, ok := message.GetData("message"); ok {
+			if s, ok := data.(string); ok {
+				result.Message = s
+			}
+		}
+		
+		if result.Success {
+			c.resolvePendingQuery(message.MessageID, &SQLResult{
+				Success: true,
+				Data:    []map[string]interface{}{{"result": result}},
+			})
+		} else {
+			c.rejectPendingQuery(message.MessageID, fmt.Errorf(result.Error))
+		}
+	}
+}
+
+func (c *Client) handleDatabaseInfoResult(message *Message) {
+	if message.MessageID != "" {
+		result := &DatabaseInfoResult{
+			Success: !message.HasError(),
+			Error:   message.Error,
+		}
+		
+		if data, ok := message.GetData("database_name"); ok {
+			if s, ok := data.(string); ok {
+				result.DatabaseName = s
+			}
+		}
+		if data, ok := message.GetData("stats"); ok {
+			if stats, ok := data.(map[string]interface{}); ok {
+				result.Stats = stats
+			}
+		}
+		
+		if result.Success {
+			c.resolvePendingQuery(message.MessageID, &SQLResult{
+				Success: true,
+				Data:    []map[string]interface{}{{"result": result}},
+			})
+		} else {
+			c.rejectPendingQuery(message.MessageID, fmt.Errorf(result.Error))
+		}
 	}
 }
 
