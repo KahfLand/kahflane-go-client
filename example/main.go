@@ -58,15 +58,10 @@ func main() {
 
 	// --- 2. Create a New Database ---
 	log.Println("\n--- Step 2: Creating a new database ---")
-	_, err = client.Query(fmt.Sprintf("DROP DATABASE IF EXISTS %s", testDatabase), &kahflane.QueryOptions{Timeout: 30 * time.Minute})
-	if err != nil {
-		log.Fatalf("Failed to drop existing test database: %v", err)
-	}
-	log.Println("Dropped existing test database (if any).")
 
-	res, err := client.Query(fmt.Sprintf("CREATE DATABASE %s", testDatabase), &kahflane.QueryOptions{Timeout: 15 * time.Minute})
-	if err != nil || !res.Success {
-		log.Fatalf("Failed to create database: %v, Result: %+v", err, res)
+	_, err = client.CreateDatabase(&kahflane.CreateDatabaseRequest{DatabaseName: testDatabase})
+	if err != nil {
+		log.Fatalf("Failed to create database: %v", err)
 	}
 	log.Printf("✅ Database '%s' created successfully.", testDatabase)
 
@@ -100,7 +95,7 @@ func main() {
 	log.Println("✅ Inserted initial data for Alice.")
 
 	// Read Data from test database
-	res, err = client.Execute(fmt.Sprintf("SELECT * FROM %s.users", testDatabase), nil)
+	res, err := client.Execute(fmt.Sprintf("SELECT * FROM %s.users", testDatabase), nil)
 	if err != nil {
 		log.Fatalf("Failed to read data: %v", err)
 	}

@@ -499,10 +499,15 @@ func (c *Client) CreateDatabase(req *CreateDatabaseRequest) (*DatabaseManagement
 		Type:      "database_create",
 		MessageID: messageID,
 	}
-	message.SetData("database_name", req.DatabaseName)
-	if req.Description != "" {
-		message.SetData("description", req.Description)
+	
+	// Create nested data structure as expected by server
+	data := map[string]interface{}{
+		"database_name": req.DatabaseName,
 	}
+	if req.Description != "" {
+		data["description"] = req.Description
+	}
+	message.SetData("data", data)
 
 	errorChan := make(chan error, 1)
 	timeout := time.NewTimer(30 * time.Second)
@@ -563,10 +568,15 @@ func (c *Client) DropDatabase(req *DropDatabaseRequest) (*DatabaseManagementResu
 		Type:      "database_drop",
 		MessageID: messageID,
 	}
-	message.SetData("database_name", req.DatabaseName)
-	if req.Force {
-		message.SetData("force", req.Force)
+	
+	// Create data payload as expected by server
+	data := map[string]interface{}{
+		"database_name": req.DatabaseName,
 	}
+	if req.Force {
+		data["force"] = req.Force
+	}
+	message.SetData("data", data)
 
 	errorChan := make(chan error, 1)
 	timeout := time.NewTimer(30 * time.Second)
